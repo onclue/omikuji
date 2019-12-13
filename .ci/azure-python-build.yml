@@ -13,6 +13,10 @@ steps:
     displayName: 'Choose default Python binary'
     condition: and(succeeded(), ne(${{ parameters.manylinux }}, 'true'), ne(variables['Agent.OS'], 'Darwin'))
 
+  - script: SET
+    displayName: 'Show all env vars'
+    condition: and(succeeded(), ne(${{ parameters.manylinux }}, 'true'), ne(variables['Agent.OS'], 'Darwin'))
+
   - bash: |
       set -e
 
