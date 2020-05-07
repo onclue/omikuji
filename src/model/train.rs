@@ -10,6 +10,7 @@ use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::iter::FromIterator;
 use std::sync::{Arc, Mutex};
+use std::time;
 
 /// Model training hyper-parameters.
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
@@ -22,6 +23,7 @@ pub struct HyperParam {
     pub linear: liblinear::HyperParam,
     pub cluster: cluster::HyperParam,
     pub tree_structure_only: bool,
+    pub train_trees_1_by_1: bool,
 }
 
 impl Default for HyperParam {
@@ -35,6 +37,7 @@ impl Default for HyperParam {
             linear: liblinear::HyperParam::default(),
             cluster: cluster::HyperParam::default(),
             tree_structure_only: false,
+            train_trees_1_by_1: false,
         }
     }
 }
@@ -77,20 +80,33 @@ impl HyperParam {
         let n_features = dataset.n_features;
 
         info!("Training model with hyper-parameters {:?}", self);
-        let start_t = time::precise_time_s();
+        let start_t = time::Instant::now();
 
         info!("Initializing tree trainer");
         let trainer = TreeTrainer::initialize(dataset, *self);
 
         info!("Start training forest");
-        let trees: Vec<_> = (0..self.n_trees)
-            .into_par_iter()
-            .map(|_| trainer.train())
-            .collect();
+        let trees = if !self.train_trees_1_by_1 {
+            (0..self.n_trees)
+                .into_par_iter()
+                .map(|_| trainer.train())
+                .collect()
+        } else {
+            let mut trees = Vec::with_capacity(self.n_trees);
+            for i in 1..=self.n_trees {
+                trainer
+                    .progress_bar
+                    .lock()
+                    .unwrap()
+                    .message(&format!("[Tree {}/{}] ", i, self.n_trees));
+                trees.push(trainer.train());
+            }
+            trees
+        };
 
         info!(
             "Model training complete; it took {:.2}s",
-            time::precise_time_s() - start_t
+            start_t.elapsed().as_secs_f32()
         );
         Model {
             trees,
@@ -120,6 +136,7 @@ impl TreeTrainer {
             .feature_lists
             .par_iter_mut()
             .for_each(|v| v.l2_normalize());
+
         // Initialize label clusters
         let all_labels = Arc::new(LabelCluster::new_from_dataset(
             &dataset,
@@ -403,9 +420,13 @@ impl LabelCluster {
         dataset: &DataSet,
         threshold: f32,
     ) -> (Vec<Index>, Vec<IndexValueVec>) {
+        info!("Computing label centroids");
         let mut label_to_feature_to_sum =
             HashMap::<Index, HashMap<Index, f32>>::with_capacity(dataset.n_labels);
+        let mut pb = create_progress_bar(dataset.feature_lists.len() as u64);
+        pb.message("Examples ");
         for (features, labels) in izip!(&dataset.feature_lists, &dataset.label_sets) {
+            pb.inc();
             for &label in labels {
                 let feature_to_sum = label_to_feature_to_sum.entry(label).or_default();
                 for &(feature, value) in features {
@@ -414,9 +435,12 @@ impl LabelCluster {
             }
         }
 
+        let mut pb = create_progress_bar(label_to_feature_to_sum.len() as u64);
+        pb.message("Labels ");
         label_to_feature_to_sum
             .into_iter()
             .map(|(label, feature_to_sum)| {
+                pb.inc();
                 let mut v = feature_to_sum.into_iter().collect_vec();
                 v.l2_normalize();
                 v.prune_with_threshold(threshold);
