@@ -1,6 +1,6 @@
 package main
 
-// #cgo LDFLAGS: -L${SRCDIR}/lib
+// #cgo LDFLAGS: -L${SRCDIR}/lib -L${SRCDIR}/c-api/target/release/deps/ -lomikuji
 // #cgo CFLAGS: -g -Wall -I${SRCDIR}/lib
 // #include "omikuji.h"
 import "C"
@@ -26,11 +26,13 @@ func Open(path string) *Model {
 	cpath := C.CString(path)
 	defer C.free(unsafe.Pointer(cpath))
 
-	return &Model{
+	model := Model{
 		path:   path,
 		handle: C.load_omikuji_model(cpath),
 		pool:   C.init_omikuji_thread_pool(NUMTHREADS),
 	}
+	fmt.Printf("model: %#v\n", model)
+	return &model
 }
 
 // Closes a model handle
@@ -39,7 +41,7 @@ func (model *Model) Close() error {
 		return nil
 	}
 	C.free_omikuji_model(model.handle)
-	C.free_omikuji_threadpool(model.pool)
+	C.free_omikuji_thread_pool(model.pool)
 	return nil
 }
 
@@ -61,15 +63,19 @@ func (model *Model) Predict(keys []uint32, vals []float32, beamSize int, topK in
 	outputLabels := make([]uint32, topK)
 	outputScores := make([]float32, topK)
 
+	var cModel *C.OMIKUJI_Model = model.handle
+	defer C.free(unsafe.Pointer(cModel))
+
 	r := C.omikuji_predict(
-		model,                           // pointer to the model
+		// (*C.OMIKUJI_Model) model,                           // pointer to the model
+		cModel,
 		C.size_t(beamSize),              // beam size
 		C.size_t(inputLen),              // length of keys and vals input arrays
-		(*C.uint32_t)&(keys[0]),         // *feature_indices
-		(*C.float)&(vals[0]),            // const float *feature_values,
+		(*C.uint32_t)(&keys[0]),         // *feature_indices
+		(*C.float)(&vals[0]),            // const float *feature_values,
 		C.size_t(topK),                  // output length
-		(*C.uint32_t)&(outputLabels[0]), // uint32_t *output_labels,
-		(*C.float)&(outputScores[0]),    // float *output_scores,
+		(*C.uint32_t)(&outputLabels[0]), // uint32_t *output_labels,
+		(*C.float)(&outputScores[0]),    // float *output_scores,
 		model.pool,                      // const OMIKUJI_ThreadPool *thread_pool_ptr
 	)
 
