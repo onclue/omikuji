@@ -15,12 +15,10 @@ func doTest() {
 
 	ids, vals := getTestSample()
 
-	err := model.PredictDefault(ids, vals)
-	if err != nil {
-		fmt.Println(err)
-	}
-	// fmt.Printf("predictions: %#v\n", preds)
-	// pp.Println(preds)
+	labels, scores := model.PredictDefault(ids, vals)
+
+	fmt.Printf("labels: %v\n", labels)
+	fmt.Printf("scores: %v\n", scores)
 }
 
 func getTestSample() ([]uint32, []float32) {

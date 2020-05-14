@@ -6,8 +6,8 @@ package main
 import "C"
 
 import (
-	"errors"
 	"fmt"
+	"log"
 	"unsafe"
 )
 
@@ -40,24 +40,32 @@ func (model *Model) Close() error {
 	if model == nil {
 		return nil
 	}
-	C.free_omikuji_model(model.handle)
-	C.free_omikuji_thread_pool(model.pool)
+
+	var cModel *C.OMIKUJI_Model = model.handle
+	defer C.free(unsafe.Pointer(cModel))
+
+	var cPool *C.OMIKUJI_ThreadPool = model.pool
+	defer C.free(unsafe.Pointer(cPool))
+
+	C.free_omikuji_model(cModel)
+	C.free_omikuji_thread_pool(cPool)
 	return nil
 }
 
 // Performs model prediction
-func (model *Model) PredictDefault(keys []uint32, vals []float32) error {
-	return model.Predict(keys, vals, 10, 10)
+func (model *Model) PredictDefault(keys []uint32, vals []float32) ([]uint32, []float32) {
+	labels, scores := model.Predict(keys, vals, 10, 10)
+	return labels, scores
 }
 
-func (model *Model) Predict(keys []uint32, vals []float32, beamSize int, topK int) error {
+func (model *Model) Predict(keys []uint32, vals []float32, beamSize int, topK int) ([]uint32, []float32) {
 	if model == nil {
-		return errors.New("model not initialized; aborting")
+		log.Fatalln("model not initialized; aborting")
 	}
 
 	inputLen := len(keys)
 	if len(vals) != inputLen {
-		return errors.New("keys and values have different length; aborting")
+		log.Fatalln("keys and values have different length; aborting")
 	}
 
 	outputLabels := make([]uint32, topK)
@@ -66,8 +74,10 @@ func (model *Model) Predict(keys []uint32, vals []float32, beamSize int, topK in
 	var cModel *C.OMIKUJI_Model = model.handle
 	defer C.free(unsafe.Pointer(cModel))
 
+	var cPool *C.OMIKUJI_ThreadPool = model.pool
+	defer C.free(unsafe.Pointer(cPool))
+
 	r := C.omikuji_predict(
-		// (*C.OMIKUJI_Model) model,                           // pointer to the model
 		cModel,
 		C.size_t(beamSize),              // beam size
 		C.size_t(inputLen),              // length of keys and vals input arrays
@@ -76,12 +86,12 @@ func (model *Model) Predict(keys []uint32, vals []float32, beamSize int, topK in
 		C.size_t(topK),                  // output length
 		(*C.uint32_t)(&outputLabels[0]), // uint32_t *output_labels,
 		(*C.float)(&outputScores[0]),    // float *output_scores,
-		model.pool,                      // const OMIKUJI_ThreadPool *thread_pool_ptr
+		cPool,                           // const OMIKUJI_ThreadPool *thread_pool_ptr
 	)
 
 	fmt.Printf("status %v: labels %v, scores %v\n", r, outputLabels, outputScores)
 
-	return nil
+	return outputLabels[0:r], outputScores[0:r]
 }
 
 /*
