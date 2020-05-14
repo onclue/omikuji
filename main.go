@@ -8,8 +8,8 @@ import (
 
 func doTest() {
 
-	model := Open("/Users/sds/go/src/github.com/onclue/omikuji/examples/model")
-	defer model.Close()
+	model := Open("/home/onclue/go/src/github.com/onclue/omikuji/examples/model")
+	// defer model.Close()
 
 	fmt.Printf("model = %v\n", model)
 
