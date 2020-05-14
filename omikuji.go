@@ -88,9 +88,6 @@ func (model *Model) Predict(keys []uint32, vals []float32, beamSize int, topK in
 		(*C.float)(&outputScores[0]),    // float *output_scores,
 		cPool,                           // const OMIKUJI_ThreadPool *thread_pool_ptr
 	)
-
-	fmt.Printf("status %v: labels %v, scores %v\n", r, outputLabels, outputScores)
-
 	return outputLabels[0:r], outputScores[0:r]
 }
 
