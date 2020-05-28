@@ -1,6 +1,6 @@
-package main
+package omikuji
 
-// #cgo LDFLAGS: -L${SRCDIR}/lib -L${SRCDIR}/c-api/target/release/deps/ -lomikuji
+// #cgo LDFLAGS: -L${SRCDIR}/lib -L${SRCDIR}/c-api/target/release/ -lomikuji
 // #cgo CFLAGS: -g -Wall -I${SRCDIR}/lib
 // #include "omikuji.h"
 import "C"

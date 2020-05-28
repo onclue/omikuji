@@ -1,24 +1,21 @@
-package main
+package omikuji
 
 import (
-	"fmt"
 	"strconv"
 	"strings"
+	"testing"
 )
 
-func doTest() {
+func TestModel(t *testing.T) {
 
 	model := Open("/home/onclue/go/src/github.com/onclue/omikuji/examples/model")
-	// defer model.Close()
-
-	fmt.Printf("model = %v\n", model)
+	t.Logf("model = %v\n", model)
 
 	ids, vals := getTestSample()
-
 	labels, scores := model.PredictDefault(ids, vals)
 
-	fmt.Printf("labels: %v\n", labels)
-	fmt.Printf("scores: %v\n", scores)
+	t.Logf("labels: %v\n", labels)
+	t.Logf("scores: %v\n", scores)
 }
 
 func getTestSample() ([]uint32, []float32) {
@@ -35,8 +32,4 @@ func getTestSample() ([]uint32, []float32) {
 		vals[i] = float32(val)
 	}
 	return ids, vals
-}
-
-func main() {
-	doTest()
 }
