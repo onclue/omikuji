@@ -6,9 +6,10 @@ package omikuji
 import "C"
 
 import (
-	"fmt"
 	"log"
 	"unsafe"
+
+	"github.com/sirupsen/logrus"
 )
 
 const NUMTHREADS = 2
@@ -31,7 +32,7 @@ func Open(path string) *Model {
 		handle: C.load_omikuji_model(cpath),
 		pool:   C.init_omikuji_thread_pool(NUMTHREADS),
 	}
-	fmt.Printf("model: %#v\n", model)
+	logrus.Debugf("model: %#v\n", model)
 	return &model
 }
 
@@ -91,45 +92,13 @@ func (model *Model) Predict(keys []uint32, vals []float32, beamSize int, topK in
 	return outputLabels[0:r], outputScores[0:r]
 }
 
-/*
-func (handle *Model) OriginalPredict(query string) (Predictions, error) {
-	cquery := C.CString(query)
-	defer C.free(unsafe.Pointer(cquery))
-
-	// Call the Predict function defined in cbits.cpp
-	// passing in the model handle and the query string
-	r := C.Predict(handle.handle, cquery, 3)
-	// the C code returns a c string which we need to
-	// convert to a go string
-	defer C.free(unsafe.Pointer(r))
-	js := C.GoString(r)
-
-	// unmarshal the json results into the predictions
-	// object. See https://blog.golang.org/json-and-go
-	predictions := []Prediction{}
-	err := json.Unmarshal([]byte(js), &predictions)
-	if err != nil {
-		return nil, err
+func (model *Model) getNumFeatures() uint32 {
+	if model == nil {
+		log.Fatalln("model not initialized; aborting")
 	}
 
-	return predictions, nil
+	var cModel *C.OMIKUJI_Model = model.handle
+	defer C.free(unsafe.Pointer(cModel))
+
+	return uint32(C.omikuji_n_features(cModel))
 }
-
-func (handle *Model) Analogy(query string) (Analogs, error) {
-	cquery := C.CString(query)
-	defer C.free(unsafe.Pointer(cquery))
-
-	r := C.Analogy(handle.handle, cquery)
-	defer C.free(unsafe.Pointer(r))
-	js := C.GoString(r)
-
-	analogies := []Analog{}
-	err := json.Unmarshal([]byte(js), &analogies)
-	if err != nil {
-		return nil, err
-	}
-
-	return analogies, nil
-}
-
-*/
