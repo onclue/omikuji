@@ -72,14 +72,8 @@ func (model *Model) Predict(keys []uint32, vals []float32, beamSize int, topK in
 	outputLabels := make([]uint32, topK)
 	outputScores := make([]float32, topK)
 
-	var cModel *C.OMIKUJI_Model = model.handle
-	defer C.free(unsafe.Pointer(cModel))
-
-	var cPool *C.OMIKUJI_ThreadPool = model.pool
-	defer C.free(unsafe.Pointer(cPool))
-
 	r := C.omikuji_predict(
-		cModel,
+		model.handle,                    // *C.OMIKUJI_Model
 		C.size_t(beamSize),              // beam size
 		C.size_t(inputLen),              // length of keys and vals input arrays
 		(*C.uint32_t)(&keys[0]),         // *feature_indices
@@ -87,7 +81,7 @@ func (model *Model) Predict(keys []uint32, vals []float32, beamSize int, topK in
 		C.size_t(topK),                  // output length
 		(*C.uint32_t)(&outputLabels[0]), // uint32_t *output_labels,
 		(*C.float)(&outputScores[0]),    // float *output_scores,
-		cPool,                           // const OMIKUJI_ThreadPool *thread_pool_ptr
+		model.pool,                      // const OMIKUJI_ThreadPool *thread_pool_ptr
 	)
 	return outputLabels[0:r], outputScores[0:r]
 }
