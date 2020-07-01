@@ -12,7 +12,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-const NUMTHREADS = 2
+const NUMTHREADS = 16
 
 // A model object. Effectively a wrapper around pointers to the
 // omikuji model and threadpool structs
